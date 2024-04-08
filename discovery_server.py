@@ -13,9 +13,12 @@ def handle_peer(client_socket):
         message = json.loads(data)
         # Process registration or keep-alive
         if message['type'] in ['register', 'keep_alive']:
-            registry[message['peer_id']] = (message['ip_address'], message['timestamp'])
+            registry[message['peer_id']] = (message['ip_address'], message['port'], message['timestamp'])
         elif message['type'] == 'query':
             response = registry.get(message['query_id'], None)
+            client_socket.send(json.dumps(response).encode('utf-8'))
+        elif message['type'] == 'query-all':
+            response = dict(registry.items())
             client_socket.send(json.dumps(response).encode('utf-8'))
     finally:
         client_socket.close()
@@ -36,11 +39,12 @@ def inactivity_checker(interval=30):
         while True:
             current_time = time.time()
             inactive_peers = []
-            for peer_id, (ip_address, timestamp) in registry.items():
-                if current_time - timestamp > 60:
+            for peer_id, (ip_address, port, timestamp) in registry.items():
+                if current_time - timestamp > 10:
                     inactive_peers.append(peer_id)
 
             for peer_id in inactive_peers:
+                print("removing: ", peer_id)
                 del registry[peer_id]
             time.sleep(interval)
     
@@ -50,6 +54,6 @@ def inactivity_checker(interval=30):
 
 
 if __name__ == '__main__':
-    start_server()
-    
+    inactivity_checker()  
+    start_server(host='127.0.0.1', port=12345)
 
