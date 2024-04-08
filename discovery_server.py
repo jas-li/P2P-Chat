@@ -34,7 +34,7 @@ def start_server(host='0.0.0.0', port=5000):
         thread = threading.Thread(target=handle_peer, args=(client_socket,))
         thread.start()
 
-def inactivity_checker(interval=30):
+def inactivity_checker(interval=5):
     def run_checker():
         while True:
             current_time = time.time()

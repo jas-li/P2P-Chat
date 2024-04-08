@@ -2,6 +2,7 @@ import socket
 import json
 import time
 import threading
+import sqlite3
 
 def register_with_server(server_ip, server_port, peer_id, ip_address, peer_port):
     """
@@ -88,7 +89,7 @@ def start_peer_server(host, port):
             while True:
                 message = client_socket.recv(1024).decode('utf-8')
                 if message:
-                    print(f"New message: {message}")
+                    print(f"\nNew message from {message}")
                 else:
                     break
         finally:
@@ -106,12 +107,32 @@ def send_message_to_peer(peer_ip, peer_port, message):
         sock.connect((peer_ip, peer_port))
         sock.sendall(message.encode('utf-8'))
 
+def initialize_db(db_path):
+    connection = sqlite3.connect(db_path)
+    cursor = connection.cursor()
+    cursor.execute('''CREATE TABLE IF NOT EXISTS messages
+                      (id INTEGER PRIMARY KEY, sender TEXT, receiver TEXT, message TEXT, timestamp REAL)''')
+    connection.commit()
+    connection.close()
+
+def log_message(db_path, sender, receiver, message, timestamp):
+    connection = sqlite3.connect(db_path)
+    cursor = connection.cursor()
+    cursor.execute('''INSERT INTO messages (sender, receiver, message, timestamp)
+                      VALUES (?, ?, ?, ?)''', (sender, receiver, message, timestamp))
+    connection.commit()
+    connection.close()
+
 def main():
     SERVER_IP = '127.0.0.1'
     SERVER_PORT = 12345
     PEER_IP = '0.0.0.0'
-    PEER_PORT = 54320  
+    PEER_PORT = 54321  
     username = input("Please enter a username: ")
+    run_peer_server(PEER_IP, PEER_PORT)
+
+    db_path = 'peer_messages.db'
+    initialize_db(db_path)
 
     register_with_server(SERVER_IP, SERVER_PORT, username, PEER_IP, PEER_PORT)
     print(f"\nUser {username} registered with the discovery server at {SERVER_IP}:{SERVER_PORT}\n")
@@ -126,9 +147,15 @@ def main():
             peer_connect = input("Which user would you like to connect to?\nEnter their username: ")
             peer_info = query_peer(SERVER_IP, SERVER_PORT, peer_connect)
             if peer_info:
+                print("Enter '~' to stop messaging\n")
                 peer_ip, peer_port = peer_info[0], peer_info[1]
-                message = input("Enter your message: ")
-                send_message_to_peer(peer_ip, peer_port, message)
+                while True:
+                    message = input("Enter your message: ")
+                    if message == '~':
+                        break
+                    payload = username + ": " + message
+                    send_message_to_peer(peer_ip, peer_port, payload)
+                    log_message(db_path, username, peer_connect, message, time.time())
             else:
                 print("\nUser does not exist.\n")
             
