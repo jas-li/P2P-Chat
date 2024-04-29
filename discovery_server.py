@@ -3,6 +3,7 @@ import socket
 import threading
 import json
 import time
+import re
 
 # Global dictionary to store active peers {peer_id: (ip_address, timestamp)}
 registry = {}
@@ -11,9 +12,15 @@ def handle_peer(client_socket):
     try:
         data = client_socket.recv(1024).decode('utf-8')
         message = json.loads(data)
+
+        # Sanitize input data (e.g., peer_id) to remove potentially harmful characters
+        sanitized_peer_id = re.sub(r'[^\w\s]', '', message.get('peer_id', ''))
+        sanitized_ip_address = re.sub(r'[^\w\s.]', '', message.get('ip_address', ''))
+        sanitized_port = re.sub(r'[^\d]', '', str(message.get('port', '')))
+
         # Process registration or keep-alive
         if message['type'] in ['register', 'keep_alive']:
-            registry[message['peer_id']] = (message['ip_address'], message['port'], message['timestamp'])
+            registry[sanitized_peer_id] = (sanitized_ip_address, sanitized_port, message['timestamp'])
         elif message['type'] == 'query':
             response = registry.get(message['query_id'], None)
             client_socket.send(json.dumps(response).encode('utf-8'))

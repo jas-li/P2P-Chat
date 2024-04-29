@@ -3,6 +3,7 @@ import json
 import time
 import threading
 import sqlite3
+import re
 
 def register_with_server(server_ip, server_port, peer_id, ip_address, peer_port):
     """
@@ -116,10 +117,14 @@ def initialize_db(db_path):
     connection.close()
 
 def log_message(db_path, sender, receiver, message, timestamp):
+    # Sanitize message to remove potentially harmful characters
+    sanitized_message = re.sub(r'[^\w\s]', '', message)
+
     connection = sqlite3.connect(db_path)
     cursor = connection.cursor()
+    # Use parameterized query to prevent SQL injection
     cursor.execute('''INSERT INTO messages (sender, receiver, message, timestamp)
-                      VALUES (?, ?, ?, ?)''', (sender, receiver, message, timestamp))
+                      VALUES (?, ?, ?, ?)''', (sender, receiver, sanitized_message, timestamp))
     connection.commit()
     connection.close()
 
